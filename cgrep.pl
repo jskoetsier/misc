@@ -80,7 +80,7 @@ my $data_split_regex = qr/^(.*?):(.*?)$/;
 ################################################################################
 
 sub reset_state {
-    """Reset the cgrep state to initial values"""
+    # Reset the cgrep state to initial values
     if ($cgrep_state{timeout_tag}) {
         Irssi::timeout_remove($cgrep_state{timeout_tag});
     }
@@ -96,7 +96,7 @@ sub reset_state {
 }
 
 sub debug_print {
-    """Print debug message if debug mode is enabled"""
+    # Print debug message if debug mode is enabled
     my ($message) = @_;
     return unless Irssi::settings_get_bool("cgrep_debug");
 
@@ -104,13 +104,13 @@ sub debug_print {
 }
 
 sub error_print {
-    """Print formatted error message"""
-    my ($message) = @_;
-    Irssi::printformat(MSGLEVEL_CLIENTCRAP, 'cgrep_error', $message);
+    # Print formatted error message
+    my ($msg) = @_;
+    Irssi::printformat(MSGLEVEL_CLIENTCRAP, 'cgrep_error', $msg);
 }
 
 sub validate_regex {
-    """Validate and compile a regular expression"""
+    # Validate and compile a regular expression
     my ($pattern) = @_;
 
     return (0, "Empty pattern") unless defined $pattern && length($pattern);
@@ -130,7 +130,7 @@ sub validate_regex {
 }
 
 sub should_search_field {
-    """Determine if a field should be included in search based on settings"""
+    # Determine if a field should be included in search based on settings
     my ($field) = @_;
     my $search_fields = Irssi::settings_get_str("cgrep_search_fields");
 
@@ -143,7 +143,7 @@ sub should_search_field {
 ################################################################################
 
 sub run_who {
-    """Execute WHO command with timeout protection"""
+    # Execute WHO command with timeout protection
     my ($server, $channel) = @_;
 
     debug_print("Executing WHO command for channel: $channel");
@@ -180,7 +180,7 @@ sub run_who {
 ################################################################################
 
 sub event_who_result {
-    """Handle individual WHO result entries"""
+    # Handle individual WHO result entries
     my ($server, $data) = @_;
 
     return unless $cgrep_state{busy};
@@ -241,7 +241,7 @@ sub event_who_result {
 }
 
 sub event_who_end {
-    """Handle end of WHO results"""
+    # Handle end of WHO results
     my ($server, $data) = @_;
 
     return unless $cgrep_state{busy};
@@ -277,7 +277,7 @@ sub event_who_end {
 ################################################################################
 
 sub cmd_cgrep {
-    """Main cgrep command handler"""
+    # Main cgrep command handler
     my ($data, $server, $window) = @_;
 
     # Trim whitespace
@@ -337,7 +337,7 @@ sub cmd_cgrep {
 }
 
 sub cmd_cgrep_help {
-    """Display help information"""
+    # Display help information
     Irssi::print("%Y═══════════════════════════════════════════════════════════════%n");
     Irssi::print("%Ycgrep v$VERSION - Enhanced Channel User Search%n");
     Irssi::print("%Y═══════════════════════════════════════════════════════════════%n");
@@ -364,7 +364,7 @@ sub cmd_cgrep_help {
 }
 
 sub cmd_cgrep_stats {
-    """Display search statistics"""
+    # Display search statistics
     Irssi::print("%Y═══════════════════════════════════════════════════════════════%n");
     Irssi::print("%Ycgrep Statistics%n");
     Irssi::print("%Y═══════════════════════════════════════════════════════════════%n");
