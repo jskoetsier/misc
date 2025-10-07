@@ -185,29 +185,39 @@ sub event_who_result {
 
     return unless $cgrep_state{busy};
 
-    debug_print("Processing WHO result: $data");
+    debug_print("Raw WHO result: $data");
 
-    # Parse the WHO response more robustly
-    my ($start, $realname) = $data =~ /$data_split_regex/;
+    # Parse the WHO response - format is typically:
+    # nickname channel ident host servername nick modes :hopcount realname
+    # The colon separates the main fields from the realname
+    my ($start, $realname) = split /:/, $data, 2;
     unless (defined $start && defined $realname) {
-        debug_print("WHO response parsing failed: $data");
+        debug_print("WHO response parsing failed - no colon separator: $data");
         return;
     }
 
-    # Split the first part into fields with limit for performance
-    my @fields = split /\s+/, $start, 7;
-    if (@fields < 7) {
-        debug_print("Insufficient WHO fields in: $start");
+    debug_print("Parsed start: '$start', realname: '$realname'");
+
+    # Split the first part into fields - expecting at least 6 fields
+    my @fields = split /\s+/, $start;
+    if (@fields < 6) {
+        debug_print("Insufficient WHO fields (got " . scalar(@fields) . "): $start");
         return;
     }
 
-    my ($me, $channel, $ident, $host, $server_name, $nick, $mode) = @fields;
+    # Standard WHO response format: me channel ident host servername nick [modes]
+    my ($me, $channel, $ident, $host, $server_name, $nick) = @fields[0..5];
+    my $mode = @fields > 6 ? $fields[6] : "";
 
-    # Extract hop count more reliably
+    debug_print("Extracted - nick: '$nick', ident: '$ident', host: '$host', realname: '$realname'");
+
+    # Extract hop count from realname - format is usually "hopcount realname"
     my $hops = "unknown";
-    if ($realname =~ s/$hop_regex//) {
+    if ($realname =~ s/^(\d+)\s+//) {
         $hops = $1;
     }
+
+    debug_print("After hop extraction - hops: '$hops', realname: '$realname'");
 
     # Build search string based on configured fields
     my @search_parts;
@@ -221,9 +231,12 @@ sub event_who_result {
     }
 
     my $search_string = join(" ", @search_parts);
+    debug_print("Search string: '$search_string'");
+    debug_print("Matching against regex: '$cgrep_state{regexp}'");
 
     # Apply the compiled regex
     if ($search_string =~ /$cgrep_state{compiled_regex}/) {
+        debug_print("MATCH FOUND!");
         Irssi::printformat(
             MSGLEVEL_CLIENTCRAP,
             'cgrep_match',
@@ -236,7 +249,8 @@ sub event_who_result {
         );
 
         $cgrep_state{results}++;
-        debug_print("Match found: $nick");
+    } else {
+        debug_print("No match for '$nick'");
     }
 }
 
