@@ -130,6 +130,22 @@ class IpRangeHunter:
             else:
                 return None
 
+            # --- New: Convert inetnum to CIDR(s) ---
+            inetnum_val = record['inetnum']
+            if ' - ' in inetnum_val:
+                try:
+                    start_ip, end_ip = [ip.strip() for ip in inetnum_val.split('-')]
+                    start = ipaddress.ip_address(start_ip)
+                    end = ipaddress.ip_address(end_ip)
+                    cidrs = [str(c) for c in ipaddress.summarize_address_range(start, end)]
+                    record['CIDR'] = ', '.join(cidrs)
+                except Exception:
+                    record['CIDR'] = ''
+            else:
+                # Sometimes inetnum is already a single CIDR (inet6num)
+                record['CIDR'] = inetnum_val
+
+            # --- Extract other attributes as before ---
             if 'attributes' in obj and 'attribute' in obj['attributes']:
                 attributes = obj['attributes']['attribute']
                 if not isinstance(attributes, list):
@@ -139,7 +155,8 @@ class IpRangeHunter:
                     name = attr.get('name', '')
                     value = attr.get('value', '')
 
-                    if name in ['netname', 'descr', 'country', 'org', 'admin-c', 'tech-c', 'status', 'mnt-by', 'created', 'last-modified']:
+                    if name in ['netname', 'descr', 'country', 'org', 'admin-c',
+                                'tech-c', 'status', 'mnt-by', 'created', 'last-modified']:
                         if name in record:
                             if isinstance(record[name], list):
                                 record[name].append(value)
@@ -236,8 +253,8 @@ def show_table_results(results, verbose=False):
                     print(f"{key:15}: {formatted_value}")
             print()
     else:
-        headers = ['Inetnum Range', 'Netname', 'Description', 'Country', 'Status']
-        col_widths = [35, 20, 40, 8, 15]
+        headers = ['Inetnum Range', 'CIDR', 'Netname', 'Description', 'Country', 'Status']
+        col_widths = [35, 35, 20, 40, 8, 15]
 
         header_line = ""
         separator_line = ""
@@ -250,12 +267,13 @@ def show_table_results(results, verbose=False):
 
         for result in results:
             inetnum = pretty_print_value(result.get('inetnum', ''))[:col_widths[0]-1]
-            netname = pretty_print_value(result.get('netname', ''))[:col_widths[1]-1]
-            description = pretty_print_value(result.get('descr', ''))[:col_widths[2]-1]
-            country = pretty_print_value(result.get('country', ''))[:col_widths[3]-1]
-            status = pretty_print_value(result.get('status', ''))[:col_widths[4]-1]
+            cidr = pretty_print_value(result.get('CIDR', ''))[:col_widths[1]-1]
+            netname = pretty_print_value(result.get('netname', ''))[:col_widths[2]-1]
+            description = pretty_print_value(result.get('descr', ''))[:col_widths[3]-1]
+            country = pretty_print_value(result.get('country', ''))[:col_widths[4]-1]
+            status = pretty_print_value(result.get('status', ''))[:col_widths[5]-1]
 
-            row_values = [inetnum, netname, description, country, status]
+            row_values = [inetnum, cidr, netname, description, country, status]
             row_line = ""
             for value, width in zip(row_values, col_widths):
                 row_line += f"{value:<{width}} "
@@ -271,8 +289,18 @@ def show_json_results(results):
     formatted_results = []
     for result in results:
         formatted_result = {}
-        for key, value in result.items():
-            formatted_result[key] = pretty_print_value(value)
+
+        # Put inetnum and CIDR first (if present)
+        if 'inetnum' in result:
+            formatted_result['inetnum'] = pretty_print_value(result['inetnum'])
+        if 'CIDR' in result:
+            formatted_result['CIDR'] = pretty_print_value(result['CIDR'])
+
+        # Then include all other fields, preserving human-friendly ordering
+        for key in result:
+            if key not in ['inetnum', 'CIDR']:
+                formatted_result[key] = pretty_print_value(result[key])
+
         formatted_results.append(formatted_result)
 
     output = {
@@ -289,14 +317,17 @@ def show_csv_results(results):
     import io
 
     if not results:
-        print("inetnum,netname,description,country,status")
+        print("inetnum,CIDR,netname,description,country,status")
         return
 
+    # Collect all possible fields
     all_fields = set()
     for result in results:
         all_fields.update(result.keys())
 
-    fieldnames = sorted(all_fields)
+    # Ensure 'inetnum' and 'CIDR' appear first, followed by all other fields alphabetically
+    remaining_fields = sorted(f for f in all_fields if f not in ['inetnum', 'CIDR'])
+    fieldnames = ['inetnum', 'CIDR'] + remaining_fields
 
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames)
